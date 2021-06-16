@@ -1,0 +1,38 @@
+{
+  "name": "fullscreeninteractive/silverstripe-restful-helpers",
+  "type": "silverstripe-vendormodule",
+  "keywords": [
+    "silverstripe",
+    "restful",
+    "api"
+  ],
+  "homepage": "https://github.com/fullscreeninteractive/silverstripe-restful-helpers",
+  "license": "BSD-3-Clause",
+  "authors": [
+    {
+      "name": "Will Rossiter",
+      "email": "will@fullscreen.io"
+    }
+  ],
+  "require": {
+    "silverstripe/framework": "^4",
+    "level51/silverstripe-jwt-utils": "^0.2"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^5.7",
+    "squizlabs/php_codesniffer": "^3"
+  },
+  "extra": {
+    "branch-alias": {
+      "dev-master": "1.x-dev"
+    }
+  },
+  "autoload": {
+    "psr-4": {
+      "FullscreenInteractive\\Restful\\": "src/",
+      "FullscreenInteractive\\Restful\\Tests\\": "tests/"
+    }
+  },
+  "prefer-stable": true,
+  "minimum-stability": "dev"
+}
