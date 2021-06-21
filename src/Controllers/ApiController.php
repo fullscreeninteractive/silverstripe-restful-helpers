@@ -36,8 +36,14 @@ class ApiController extends Controller
             $this->vars = array_change_key_case($this->vars);
         }
 
-        $this->response->addHeader('Access-Control-Allow-Origin', '*');
-        $this->response->addHeader("Content-type", "application/json");
+        $this->getResponse()
+            ->addHeader('Access-Control-Allow-Origin', '*')
+            ->addHeader("Content-type", "application/json");
+    }
+
+    public function index()
+    {
+        return $this->httpError(400, 'Bad Request');
     }
 
     /**
@@ -47,12 +53,12 @@ class ApiController extends Controller
      */
     protected function success(array $context = []): HTTPResponse
     {
-        $this->response->setBody(json_encode(array_merge([
+        $this->getResponse()->setBody(json_encode(array_merge([
             'timestamp' => time(),
             'success' => 1
         ], $context)));
 
-        return $this->response;
+        return $this->getResponse();
     }
 
     /**
@@ -62,24 +68,20 @@ class ApiController extends Controller
      */
     protected function failure(array $context = [])
     {
-        $this->response->setBody(json_encode(array_merge([
+        $response = $this->getResponse();
+
+        $response->setBody(json_encode(array_merge([
             'timestamp' => time(),
             'success' => 0
         ], $context)));
 
         if (isset($context['status_code'])) {
-            $this->response->setStatusCode($context['status_code']);
+            $response->setStatusCode($context['status_code']);
         } else {
-            $this->response->setStatusCode(400);
+            $response->setStatusCode(400);
         }
 
-        return $this->response;
-    }
-
-
-    public function index()
-    {
-        return $this->success();
+        return $response;
     }
 
     /**
@@ -109,9 +111,7 @@ class ApiController extends Controller
      */
     public function returnArray($arr)
     {
-        $this->response->setBody(json_encode($arr));
-
-        return $this->response;
+        return $this->getResponse()->setBody(json_encode($arr));
     }
 
     /**
@@ -193,7 +193,9 @@ class ApiController extends Controller
                 case 404:
                     $errorMessage = 'Missing resource';
                     break;
-
+                case 400:
+                    $errorMessage = 'Bad Request';
+                    break;
                 default:
                     $errorMessage = 'Permission denied resource';
                     break;
@@ -270,9 +272,6 @@ class ApiController extends Controller
      */
     public function returnJSON($arr)
     {
-        $this->response->setBody(json_encode($arr));
-
-        return $this->response;
+        return $this->getResponse()->setBody(json_encode($arr));
     }
-
 }
