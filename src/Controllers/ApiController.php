@@ -52,7 +52,7 @@ class ApiController extends Controller
      *
      * @param array $context
      */
-    protected function success(array $context = []): HTTPResponse
+    public function success(array $context = []): HTTPResponse
     {
         $this->getResponse()->setBody(json_encode(array_merge([
             'timestamp' => time(),
@@ -67,7 +67,7 @@ class ApiController extends Controller
      *
      * @param array $context
      */
-    protected function failure(array $context = [])
+    public function failure(array $context = [])
     {
         $response = $this->getResponse();
 
@@ -289,7 +289,7 @@ class ApiController extends Controller
      *
      * @return mixed
      */
-    protected function getVar($name)
+    public function getVar($name)
     {
         $key = strtolower($name);
 
@@ -301,7 +301,7 @@ class ApiController extends Controller
      *
      * @return boolean
      */
-    protected function hasVar($name)
+    public function hasVar($name)
     {
         $key = strtolower($name);
 
@@ -309,24 +309,34 @@ class ApiController extends Controller
     }
 
     /**
+     * Returns an array of all the variables listed from the POST or GET vars
+     *
+     *
      * @param array
      *
-     * @return boolean
+     * @return array
+     *
      * @throws HTTPResponse_Exception
      */
-    protected function ensureVars(array $vars = [])
+    public function ensureVars(array $vars = [])
     {
+        $output = [];
+
         foreach ($vars as $k => $v) {
             if ($v && is_callable($v)) {
                 if (!$this->hasVar($k) || !$v($this->getVar($k))) {
                     throw $this->httpError(400, 'Missing required variable: '. $v);
                 }
+
+                $output[] = $this->getVar($k);
             } elseif (!$this->hasVar($v)) {
                 throw $this->httpError(400, 'Missing required variable: '. $v);
+            } else {
+                $output[] = $this->getVar($v);
             }
         }
 
-        return true;
+        return $output;
     }
 
     /**
@@ -334,7 +344,7 @@ class ApiController extends Controller
      *
      * @return HTTPResponse
      */
-    protected function returnJSON($arr)
+    public function returnJSON($arr)
     {
         return $this->getResponse()->setBody(json_encode($arr));
     }
@@ -342,7 +352,7 @@ class ApiController extends Controller
     /**
      * @throws HTTPResponse_Exception
      */
-    protected function ensureGET()
+    public function ensureGET()
     {
         if (!$this->request->isGet()) {
             $this->httpError(400, 'Request must be provided as a GET request');
@@ -352,7 +362,7 @@ class ApiController extends Controller
     /**
      * @throws HTTPResponse_Exception
      */
-    protected function ensurePOST()
+    public function ensurePOST()
     {
         if (!$this->request->isPost()) {
             $this->httpError(400, 'Request must be provided as a POST request');

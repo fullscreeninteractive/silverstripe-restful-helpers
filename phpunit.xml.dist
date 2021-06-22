@@ -1,0 +1,24 @@
+<phpunit bootstrap="../../silverstripe/framework/tests/bootstrap.php" colors="true">
+    <testsuite name="Default">
+        <directory>tests</directory>
+    </testsuite>
+
+    <filter>
+        <whitelist addUncoveredFilesFromWhitelist="true">
+            <directory suffix=".php">src/</directory>
+            <exclude>
+                <directory suffix=".php">tests/</directory>
+            </exclude>
+        </whitelist>
+    </filter>
+
+    <php>
+        <env name="SS_DATABASE_CLASS" value="SQLite3Database" force="true" />
+        <env name="SS_DATABASE_PATH" value=":memory:" force="true" />
+        <env name="SS_ENVIRONMENT_TYPE" value="dev" force="true" />
+        <env name="SS_DATABASE_CHOOSE_NAME" value="true" force="true" />
+        <env name="SS_DEFAULT_ADMIN_USERNAME" value="admin" force="true" />
+        <env name="SS_DEFAULT_ADMIN_PASSWORD" value="password" force="true" />
+        <env name="SS_BASE_URL" value="http://localhost" force="true" />
+    </php>
+</phpunit>

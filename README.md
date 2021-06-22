@@ -91,11 +91,11 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
     public function createProject()
     {
         $this->ensurePOST();
-        $this->ensureLoggedIn([
+        $this->ensureUserLoggedIn([
             'ADMIN'
         ]);
 
-        $this->ensureVars([
+        list($title, $date) = $this->ensureVars([
             'Title',
             'Date' => function($value) {
                 return strtotime($value) > 0
@@ -103,7 +103,8 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
         ]);
 
         $project = new Project();
-        $project->Title = $this->getVar('Title');
+        $project->Title = $title;
+        $project->Date = $title;
         $project->write();
 
         return $this->success([
@@ -114,15 +115,15 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
     public function deleteProject()
     {
         $this->ensurePOST();
-        $this->ensureLoggedIn([
+        $this->ensureUserLoggedIn([
             'ADMIN'
         ]);
 
-        $this->ensureVars([
+        list($id) = $this->ensureVars([
             'id'
         ]);
 
-        $project = Project::get()->byID($this->getVar('id));
+        $project = Project::get()->byID($id);
 
         if (!$project) {
             return $this->failure([
