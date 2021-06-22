@@ -244,6 +244,12 @@ class ApiController extends Controller
         return '';
     }
 
+    /**
+     * @param int $errorCode
+     * @param string $errorMessage
+     *
+     * @throws HTTPResponse_Exception
+     */
     public function httpError($errorCode = 404, $errorMessage = '')
     {
         if (!$errorMessage) {
@@ -283,7 +289,7 @@ class ApiController extends Controller
      *
      * @return mixed
      */
-    public function getVar($name)
+    protected function getVar($name)
     {
         $key = strtolower($name);
 
@@ -295,7 +301,7 @@ class ApiController extends Controller
      *
      * @return boolean
      */
-    public function hasVar($name)
+    protected function hasVar($name)
     {
         $key = strtolower($name);
 
@@ -308,7 +314,7 @@ class ApiController extends Controller
      * @return boolean
      * @throws HTTPResponse_Exception
      */
-    public function ensureVars(array $vars = [])
+    protected function ensureVars(array $vars = [])
     {
         foreach ($vars as $k => $v) {
             if ($v && is_callable($v)) {
@@ -328,8 +334,28 @@ class ApiController extends Controller
      *
      * @return HTTPResponse
      */
-    public function returnJSON($arr)
+    protected function returnJSON($arr)
     {
         return $this->getResponse()->setBody(json_encode($arr));
+    }
+
+    /**
+     * @throws HTTPResponse_Exception
+     */
+    protected function ensureGET()
+    {
+        if (!$this->request->isGet()) {
+            $this->httpError(400, 'Request must be provided as a GET request');
+        }
+    }
+
+    /**
+     * @throws HTTPResponse_Exception
+     */
+    protected function ensurePOST()
+    {
+        if (!$this->request->isPost()) {
+            $this->httpError(400, 'Request must be provided as a POST request');
+        }
     }
 }
