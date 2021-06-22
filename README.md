@@ -8,9 +8,7 @@ beats a simple REST solution.
 Handles authenication and provides common functions for serving and parsing
 API requests. Compared to `silverstripe-restfulserver` this module does very
 little scaffolding of models and fields out of the box but instead relies on
-developers to design the API layout (although scaffolding helpers are available
-
-- see below)
+developers to design the API layout (although scaffolding helpers are available)
 
 ## Installation
 
@@ -32,10 +30,10 @@ Level51\JWTUtils\JWTUtils:
   renew_threshold_in_minutes: 60
 ```
 
-Setup the routing for the API. You can modify the name of the routes as
-required for the project or use your own classes. At the very least you would
-have a project-specific end point which would subclass the `ApiController` for
-example, `MyProjectsApi`.
+Next step is to setup the routing for the API. You can modify the name of the 
+routes as required for the project. At the very least you would have a 
+project-specific end point which would subclass the `ApiController` for example, 
+`MyProjectsApi`.
 
 _app/\_config/routes.yml_
 
@@ -44,7 +42,6 @@ SilverStripe\Control\Director:
   rules:
     'api/v1/auth/$Action': 'FullscreenInteractive\Restful\Controllers\AuthController'
     'api/v1/projects//$Action': 'MyProjectsApi'
-    'api/v1//$Action/': 'FullscreenInteractive\Restful\Controllers\ApiController'
 ```
 
 Here is an example of `MyProjectsApi` which demostrates some of the helpers
@@ -57,6 +54,7 @@ _app/src/Project.php_
 <?php
 
 use FullscreenInteractive\Restful\Interfaces\ApiReadable;
+use SilverStripe\Security\Member;
 use SilverStripe\ORM\DataObject;
 
 class Project extends DataObject implements ApiReadable
@@ -65,6 +63,18 @@ class Project extends DataObject implements ApiReadable
         'Title' => 'Varchar(100)',
         'Date' => 'DBDate'
     ];
+	
+	private static $has_one = [
+		'Author' => Member::class
+	];
+    
+    public function toApi(): array
+    {
+    	return [
+	    	'title' => $this->Title,
+		    'date' => $this->dbObject('Date')->getTimestamp()
+		];
+	}
 }
 ```
 
@@ -91,7 +101,8 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
     public function createProject()
     {
         $this->ensurePOST();
-        $this->ensureUserLoggedIn([
+		
+        $member = $this->ensureUserLoggedIn([
             'ADMIN'
         ]);
 
@@ -104,10 +115,11 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
 
         $project = new Project();
         $project->Title = $title;
-        $project->Date = $title;
+        $project->Date = $date;
+		$project->AuthorID = $member->ID;
         $project->write();
 
-        return $this->success([
+        return $this->returnJSON([
             'project' => $project->toApi()
         ]);
     }
@@ -115,7 +127,8 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
     public function deleteProject()
     {
         $this->ensurePOST();
-        $this->ensureUserLoggedIn([
+		
+        $member = $this->ensureUserLoggedIn([
             'ADMIN'
         ]);
 
@@ -132,8 +145,10 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
             ]);
         }
 
-        $project->delete();
-
+		if ($project->canDelete($member)) {
+			$project->delete();
+		}
+	
         return $this->success();
     }
 }
@@ -203,7 +218,10 @@ fetch('/api/v1/projects/createProject', {
 })
 ```
 
+## API Documentation
+
+Todo but it's not massive. See `ApiController` for now.
+
 ## Licence
 
 BSD-3-Clause
-```
