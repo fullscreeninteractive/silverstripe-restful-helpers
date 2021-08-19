@@ -23,21 +23,21 @@ the [https://github.com/Level51/silverstripe-jwt-utils/](JWTUtils) module.
 
 _app/\_config/api.yml_
 
-```
+```yml
 Level51\JWTUtils\JWTUtils:
   secret: 'replace-this-with-a-jwt-secret-for-jwt'
   lifetime_in_days: 365
   renew_threshold_in_minutes: 60
 ```
 
-Next step is to setup the routing for the API. You can modify the name of the 
-routes as required for the project. At the very least you would have a 
-project-specific end point which would subclass the `ApiController` for example, 
+Next step is to setup the routing for the API. You can modify the name of the
+routes as required for the project. At the very least you would have a
+project-specific end point which would subclass the `ApiController` for example,
 `MyProjectsApi`.
 
 _app/\_config/routes.yml_
 
-```
+```yml
 SilverStripe\Control\Director:
   rules:
     'api/v1/auth/$Action': 'FullscreenInteractive\Restful\Controllers\AuthController'
@@ -50,7 +50,7 @@ list of all projects, logged in ADMIN users can `POST api/v1/projects/create`
 
 _app/src/Project.php_
 
-```
+```php
 <?php
 
 use FullscreenInteractive\Restful\Interfaces\ApiReadable;
@@ -63,24 +63,24 @@ class Project extends DataObject implements ApiReadable
         'Title' => 'Varchar(100)',
         'Date' => 'DBDate'
     ];
-	
-	private static $has_one = [
-		'Author' => Member::class
-	];
-    
+
+    private static $has_one = [
+        'Author' => Member::class
+    ];
+
     public function toApi(): array
     {
-    	return [
-	    	'title' => $this->Title,
-		    'date' => $this->dbObject('Date')->getTimestamp()
-		];
-	}
+        return [
+            'title' => $this->Title,
+            'date' => $this->dbObject('Date')->getTimestamp()
+        ];
+    }
 }
 ```
 
 _app/src/MyProjectsApi.php_
 
-```
+```php
 <?php
 
 class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiController
@@ -101,7 +101,7 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
     public function createProject()
     {
         $this->ensurePOST();
-		
+
         $member = $this->ensureUserLoggedIn([
             'ADMIN'
         ]);
@@ -116,7 +116,7 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
         $project = new Project();
         $project->Title = $title;
         $project->Date = $date;
-		$project->AuthorID = $member->ID;
+        $project->AuthorID = $member->ID;
         $project->write();
 
         return $this->returnJSON([
@@ -127,7 +127,7 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
     public function deleteProject()
     {
         $this->ensurePOST();
-		
+
         $member = $this->ensureUserLoggedIn([
             'ADMIN'
         ]);
@@ -145,10 +145,10 @@ class MyProjectsApi extends FullscreenInteractive\Restful\Controllers\ApiControl
             ]);
         }
 
-		if ($project->canDelete($member)) {
-			$project->delete();
-		}
-	
+        if ($project->canDelete($member)) {
+            $project->delete();
+        }
+
         return $this->success();
     }
 }
@@ -161,7 +161,7 @@ receive a token the user must first exchange their username / password over
 basic authenication by making a `POST` request with the credentials. Usually
 this is some form of javascript request e.g
 
-```
+```js
 fetch('/api/v1/auth/token', {
     method: "POST",
     headers: {
@@ -177,15 +177,15 @@ The response from that request with either be an error code (> 200) or if user
 and password is correct, a 200 response containing the JWT. The token and
 related meta data can be saved securely client side for reuse.
 
-```
+```js
 {
-	"token": "eyJ0eXAiOiJKV1QiL...",
-	"member": {
-		"id": 1,
-		"email": "js@lvl51.de",
-		"firstName": "Julian",
-		"surname": "Scheuchenzuber"
-	}
+    "token": "eyJ0eXAiOiJKV1QiL...",
+    "member": {
+        "id": 1,
+        "email": "js@lvl51.de",
+        "firstName": "Julian",
+        "surname": "Scheuchenzuber"
+    }
 }
 ```
 
@@ -193,7 +193,7 @@ If a user's token is invalid, or expired a *401* error will be returned. To
 validate a users token use the `verify` endpoint - this will check the token and
 renew the token if required.
 
-```
+```js
 fetch('/api/v1/auth/verify', {
     method: "GET",
     headers: {
@@ -206,7 +206,7 @@ fetch('/api/v1/auth/verify', {
 
 The token can then be used to sign API calls as the `Bearer` header.
 
-```
+```js
 fetch('/api/v1/projects/createProject', {
     method: "POST",
     headers: {
@@ -217,6 +217,23 @@ fetch('/api/v1/projects/createProject', {
     },
 })
 ```
+
+## UUIDs
+
+https://stackoverflow.com/questions/56576985/is-it-a-bad-practice-to-expose-the-database-id-to-the-client-in-your-rest-api/56577271
+
+When designing an API you may wish to avoid exposing your internal ID's to
+in responses.
+
+To add a UUID field to your object add the following extension to your model
+
+```php
+private static $extensions = [
+    UuidableExtension::class
+];
+```
+
+A UUID will be generated on an objects `onBeforeWrite()` .
 
 ## API Documentation
 
