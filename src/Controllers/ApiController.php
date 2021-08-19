@@ -20,7 +20,26 @@ class ApiController extends Controller
     {
         parent::init();
 
-        // normalize query variables
+        if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+            $response = $this->getResponse()
+                ->addHeader('Access-Control-Allow-Origin', '*')
+                ->addHeader("Content-type", "application/json");
+
+            if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'])) {
+                $response = $response->addHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+            }
+
+            if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
+                $response = $response->addHeader(
+                    'Access-Control-Allow-Headers',
+                    $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']
+                );
+            }
+
+            $response->output();
+            exit;
+        }
+
         if (strpos($this->request->getHeader('Content-Type'), 'application/json') !== false) {
             $input = json_decode(file_get_contents("php://input"), true);
 
@@ -277,6 +296,7 @@ class ApiController extends Controller
         );
 
         $response->addHeader("Content-type", "application/json");
+        $response->addHeader('Access-Control-Allow-Origin', '*');
 
         $err = new HTTPResponse_Exception();
         $err->setResponse($response);
