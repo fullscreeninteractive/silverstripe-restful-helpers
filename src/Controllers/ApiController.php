@@ -61,6 +61,7 @@ class ApiController extends Controller
             ->addHeader("Content-type", "application/json");
     }
 
+
     public function index()
     {
         return $this->httpError(400, 'Bad Request');
@@ -234,10 +235,10 @@ class ApiController extends Controller
     {
         $header = '';
 
-        if (isset($_SERVER['Authorization'])) {
-            $header = trim($_SERVER["Authorization"]);
-        } elseif (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $header = trim($_SERVER["HTTP_AUTHORIZATION"]);
+        if ($auth = $this->getRequest()->getHeader('Authorization')) {
+            $header = trim($auth);
+        } elseif ($auth = $this->getRequest()->getHeader('HTTP_AUTHORIZATION')) {
+            $header = trim($auth);
         } elseif (function_exists('apache_request_headers')) {
             $requestHeaders = apache_request_headers();
             $requestHeaders = array_combine(array_map('ucwords', array_keys($requestHeaders)), array_values($requestHeaders));
@@ -250,6 +251,11 @@ class ApiController extends Controller
         return $header;
     }
 
+    /**
+     * Returns the bearer token value from the Authorization Header
+     *
+     * @return string
+     */
     public function getBearerToken(): string
     {
         $headers = $this->getAuthorizationHeader();
