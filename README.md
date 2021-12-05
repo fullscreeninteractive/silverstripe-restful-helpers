@@ -218,6 +218,47 @@ fetch('/api/v1/projects/createProject', {
 })
 ```
 
+## Authenication via silverstripe-apikeys
+
+If you would prefer to use API keys rather than JWT tokens, you can use 
+https://github.com/sminnee/silverstripe-apikey and configure it as a route
+specific middleware 
+
+```yml
+SilverStripe\Core\Injector\Injector:
+  ApiRouteMiddleware:
+    class: SilverStripe\Control\Middleware\RequestHandlerMiddlewareAdapter
+    properties:
+      RequestHandler: '%$MyProjectApi'
+      Middlewares:
+        CustomMiddleware: '%$ApiKeyRequestMiddleware'
+  MyProjectApi:
+    class: MyProjectApi
+  ApiKeyRequestMiddleware:
+    class: Sminnee\ApiKey\ApiKeyRequestMiddleware
+SilverStripe\Control\Director:
+  rules:
+    api:
+      Controller: '%$ApiRouteMiddleware'
+
+```
+
+Out of the box, the silverstripe-apikey module will not throw an error if
+no API key is provided (but it will if a wrong one is). So in the short term
+you're best to double check and handle if the API key is not provided
+
+```
+public function projects()
+{
+  if (!$this->ensureUserLoggedIn()) {
+    return $this->failure(401);
+  }
+  
+  // ..
+}
+```
+
+
 ## UUIDs
 
 https://stackoverflow.com/questions/56576985/is-it-a-bad-practice-to-expose-the-database-id-to-the-client-in-your-rest-api/56577271
