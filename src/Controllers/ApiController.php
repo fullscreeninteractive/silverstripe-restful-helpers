@@ -135,19 +135,58 @@ class ApiController extends Controller
         return $this->getResponse()->setBody(json_encode($arr));
     }
 
+
     /**
      * Convert a provided DataList to a PaginatedList and return the source.
      *
      * @param SS_List $list
      * @param callable $keyFunc
      * @param callabale $dataFunc
+     * @param int $pageLength
      *
      * @return array
      */
-    public function prepPaginatedOutput(SS_List $list, $keyFunc = null, $dataFunc = null): array
+    public function prepList(SS_List $list, $keyFunc = null, $dataFunc = null): array
+    {
+        $output = [];
+
+        foreach ($list as $item) {
+            if ($dataFunc) {
+                $record = $dataFunc($item);
+            } else if (is_array($item)) {
+                $record = $item;
+            } else {
+                $record = $item->toApi();
+            }
+
+            if ($keyFunc) {
+                $output[$keyFunc($item)] = $record;
+            } else {
+                $output[] = $record;
+            }
+        }
+
+        return [
+            $list,
+            $output
+        ];
+    }
+
+
+    /**
+     * Convert a provided List to a PaginatedList and return the source.
+     *
+     * @param SS_List $list
+     * @param callable $keyFunc
+     * @param callabale $dataFunc
+     * @param int $pageLength
+     *
+     * @return array
+     */
+    public function prepPaginatedOutput(SS_List $list, $keyFunc = null, $dataFunc = null, $pageLength = 100): array
     {
         $list = new PaginatedList($list, $this->request);
-        $list->setPageLength(100);
+        $list->setPageLength($pageLength);
         $output = [];
 
         foreach ($list as $item) {
