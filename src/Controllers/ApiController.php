@@ -40,7 +40,9 @@ class ApiController extends Controller
             exit;
         }
 
-        if (strpos($this->request->getHeader('Content-Type'), 'application/json') !== false) {
+        $contentType = (string) $this->request->getHeader('Content-Type');
+
+        if (strpos($contentType, 'application/json') !== false) {
             $input = json_decode(file_get_contents("php://input"), true);
 
             if ($input) {
