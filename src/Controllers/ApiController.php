@@ -8,8 +8,10 @@ use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Control\HTTPResponse_Exception;
 use SilverStripe\Core\Config\Config;
+use SilverStripe\Core\Injector\Injector;
 use SilverStripe\ORM\PaginatedList;
 use SilverStripe\ORM\SS_List;
+use SilverStripe\Security\IdentityStore;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
@@ -238,7 +240,7 @@ class ApiController extends Controller
                 }
             }
 
-            $member->login();
+            Injector::inst()->get(IdentityStore::class)->logIn($member);
 
             Security::setCurrentUser($member);
 
