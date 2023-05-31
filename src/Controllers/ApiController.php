@@ -435,4 +435,16 @@ class ApiController extends Controller
             $this->httpError(400, 'Request must be provided as a POST request');
         }
     }
+
+    /**
+     * @throws HTTPResponse_Exception
+     */
+    public function ensureDelete(): void
+    {
+        if ($this->request->isDELETE()) {
+            return;
+        }
+
+        $this->httpError(400, 'Request must be provided as a DELETE request');
+    }
 }
