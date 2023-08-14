@@ -111,12 +111,13 @@ class ApiController extends Controller
      * @param SS_List $list
      * @param callable $keyFunc
      * @param callable $dataFunc
+     * @param int $pageLength
      *
      * @return HTTPResponse
      */
-    public function returnPaginated(SS_List $list, $keyFunc = null, $dataFunc = null)
+    public function returnPaginated(SS_List $list, $keyFunc = null, $dataFunc = null, $pageLength = 100)
     {
-        list($list, $output) = $this->prepPaginatedOutput($list, $keyFunc, $dataFunc);
+        list($list, $output) = $this->prepPaginatedOutput($list, $keyFunc, $dataFunc, $pageLength);
 
         return $this->returnArray([
             'records' => $output,
@@ -227,7 +228,8 @@ class ApiController extends Controller
         $token = JWT::decode(
             $this->getJwt(),
             Config::inst()->get(JWTUtils::class, 'secret'),
-            ['HS256']);
+            ['HS256']
+        );
 
         $member = Member::get()->byID($token->memberId);
 
@@ -392,12 +394,12 @@ class ApiController extends Controller
         foreach ($vars as $k => $v) {
             if ($v && is_callable($v)) {
                 if (!$this->hasVar($k) || !$v($this->getVar($k))) {
-                    throw $this->httpError(400, 'Missing required variable: '. $v);
+                    throw $this->httpError(400, 'Missing required variable: ' . $v);
                 }
 
                 $output[] = $this->getVar($k);
             } elseif (!$this->hasVar($v)) {
-                throw $this->httpError(400, 'Missing required variable: '. $v);
+                throw $this->httpError(400, 'Missing required variable: ' . $v);
             } else {
                 $output[] = $this->getVar($v);
             }

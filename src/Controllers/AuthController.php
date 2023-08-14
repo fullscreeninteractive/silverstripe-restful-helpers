@@ -12,16 +12,17 @@ class AuthController extends ApiController
         'verify',
     ];
 
-    private static $test = '123';
-
     /**
      * The token is acquired by using basic auth. Once the user has entered the
      * username / password and completed this first step then we give them back
      * a token which contains their information
      */
-    public function token() {
+    public function token()
+    {
         try {
             $payload = JWTUtils::inst()->byBasicAuth($this->request);
+
+            $this->extend('updatePayload', $payload);
 
             return $this->returnArray($payload);
         } catch (JWTUtilsException $e) {
