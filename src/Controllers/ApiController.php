@@ -3,6 +3,7 @@
 namespace FullscreenInteractive\Restful\Controllers;
 
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use Level51\JWTUtils\JWTUtils;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPResponse;
@@ -228,8 +229,11 @@ class ApiController extends Controller
     {
         $token = JWT::decode(
             $this->getJwt(),
-            Config::inst()->get(JWTUtils::class, 'secret'),
-            ['HS256']);
+            new Key(
+                Config::inst()->get(JWTUtils::class, 'secret'),
+                'HS256'
+            )
+        );
 
         $member = Member::get()->byID($token->memberId);
 
