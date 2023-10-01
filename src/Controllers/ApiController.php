@@ -3,6 +3,7 @@
 namespace FullscreenInteractive\Restful\Controllers;
 
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use Level51\JWTUtils\JWTUtils;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPResponse;
@@ -225,28 +226,32 @@ class ApiController extends Controller
      */
     public function ensureUserLoggedIn($permissionCodes = [])
     {
-        $token = JWT::decode(
+        $token = (array)JWT::decode(
             $this->getJwt(),
-            Config::inst()->get(JWTUtils::class, 'secret'),
-            ['HS256']
+            new Key(
+                Config::inst()->get(JWTUtils::class, 'secret'),
+                'HS256'
+            )
         );
 
-        $member = Member::get()->byID($token->memberId);
+        if ($token && isset($token['memberId'])) {
+            $member = Member::get()->byID($token['memberId']);
 
-        if ($member) {
-            if ($permissionCodes) {
-                if (!Permission::checkMember($member, $permissionCodes)) {
-                    return $this->httpError(401);
+            if ($member) {
+                if ($permissionCodes) {
+                    if (!Permission::checkMember($member, $permissionCodes)) {
+                        return $this->httpError(401);
+                    }
                 }
+
+                $member->login();
+
+                Security::setCurrentUser($member);
+
+                return $member;
+            } else {
+                return $this->httpError(401);
             }
-
-            $member->login();
-
-            Security::setCurrentUser($member);
-
-            return $member;
-        } else {
-            return $this->httpError(401);
         }
     }
 
