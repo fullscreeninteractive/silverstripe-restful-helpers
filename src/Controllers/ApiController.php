@@ -117,9 +117,9 @@ class ApiController extends Controller
      *
      * @return HTTPResponse
      */
-    public function returnPaginated(SS_List $list, $keyFunc = null, $dataFunc = null)
+    public function returnPaginated(SS_List $list, $keyFunc = null, $dataFunc = null, $pageLength = 100)
     {
-        list($list, $output) = $this->prepPaginatedOutput($list, $keyFunc, $dataFunc);
+        list($list, $output) = $this->prepPaginatedOutput($list, $keyFunc, $dataFunc, $pageLength);
 
         return $this->returnArray([
             'records' => $output,
