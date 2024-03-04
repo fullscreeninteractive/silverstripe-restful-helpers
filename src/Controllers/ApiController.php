@@ -46,12 +46,27 @@ class ApiController extends Controller
         $contentType = (string) $this->request->getHeader('Content-Type');
 
         if (strpos($contentType, 'application/json') !== false) {
-            $input = json_decode(file_get_contents("php://input"), true);
+            $jsonPayload = trim(file_get_contents("php://input"));
+            $input = json_decode($jsonPayload, true);
 
             if ($input) {
                 $this->vars = array_merge($input, $this->request->getVars());
+            } else if ($jsonPayload) {
+                $error = json_last_error();
+
+                switch ($error) {
+                    case JSON_ERROR_NONE:
+                        $this->vars = $this->request->getVars();
+                    break;
+                    default:
+                        $this->failure([
+                            'error' => 'Invalid JSON',
+                            'code' => $error
+                        ]);
+                    break;
+                }
             } else {
-                $this->vars = $this->request->getVars();
+                $this->vars = $this->request->requestVars();
             }
         } else {
             $this->vars = $this->request->requestVars();
@@ -377,7 +392,6 @@ class ApiController extends Controller
     public function hasVar($name)
     {
         $key = strtolower($name);
-
         return (isset($this->vars[$key]));
     }
 
