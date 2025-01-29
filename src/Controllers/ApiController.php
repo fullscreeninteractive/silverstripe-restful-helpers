@@ -284,14 +284,32 @@ class ApiController extends Controller
             return $this->httpError(401);
         }
 
+        $token = JWT::decode(
+            $bearer,
+            new Key(
+                Config::inst()->get(JWTUtils::class, 'secret'),
+                'HS256'
+            )
+        );
+
         $jwt = JWTUtils::inst()->renew($bearer);
 
         if (!$jwt) {
             return $this->httpError(401);
         }
 
+        // Set the current user
+        $memberId = $token->memberId;
+        $member = Member::get()->byID($memberId);
+
+        if ($member) {
+            Injector::inst()->get(IdentityStore::class)->logIn($member);
+            Security::setCurrentUser($member);
+        }
+
         return $jwt;
     }
+
 
     public function getAuthorizationHeader(): string
     {
