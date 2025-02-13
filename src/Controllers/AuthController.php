@@ -6,6 +6,7 @@ use Level51\JWTUtils\JWTUtils;
 use Level51\JWTUtils\JWTUtilsException;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
+use SilverStripe\View\ArrayData;
 
 class AuthController extends ApiController
 {
@@ -27,7 +28,17 @@ class AuthController extends ApiController
                 $member = Member::get()->byID($payload['member']['id']);
 
                 if ($member) {
-                    $payload['member'] = array_merge($payload['member'], $member->toApi());
+                    $api = [];
+
+                    if ($member->hasMethod('toApi')) {
+                        $api = $member->toApi() ?? [];
+
+                        if ($api instanceof ArrayData) {
+                            $api = $api->toMap();
+                        }
+                    }
+
+                    $payload['member'] = array_merge($payload['member'], $api);
                 }
 
                 return $this->returnArray($payload);
