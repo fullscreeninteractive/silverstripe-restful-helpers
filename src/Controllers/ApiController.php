@@ -9,8 +9,10 @@ use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Control\HTTPResponse_Exception;
 use SilverStripe\Core\Config\Config;
+use SilverStripe\Core\Injector\Injector;
 use SilverStripe\ORM\PaginatedList;
 use SilverStripe\ORM\SS_List;
+use SilverStripe\Security\IdentityStore;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
@@ -44,12 +46,27 @@ class ApiController extends Controller
         $contentType = (string) $this->request->getHeader('Content-Type');
 
         if (strpos($contentType, 'application/json') !== false) {
-            $input = json_decode(file_get_contents("php://input"), true);
+            $jsonPayload = trim(file_get_contents("php://input"));
+            $input = json_decode($jsonPayload, true);
 
             if ($input) {
                 $this->vars = array_merge($input, $this->request->getVars());
+            } else if ($jsonPayload) {
+                $error = json_last_error();
+
+                switch ($error) {
+                    case JSON_ERROR_NONE:
+                        $this->vars = $this->request->getVars();
+                    break;
+                    default:
+                        $this->failure([
+                            'error' => 'Invalid JSON',
+                            'code' => $error
+                        ]);
+                    break;
+                }
             } else {
-                $this->vars = $this->request->getVars();
+                $this->vars = $this->request->requestVars();
             }
         } else {
             $this->vars = $this->request->requestVars();
@@ -244,7 +261,7 @@ class ApiController extends Controller
                     }
                 }
 
-                $member->login();
+                Injector::inst()->get(IdentityStore::class)->logIn($member);
 
                 Security::setCurrentUser($member);
 
@@ -270,14 +287,32 @@ class ApiController extends Controller
             return $this->httpError(401);
         }
 
+        $token = JWT::decode(
+            $bearer,
+            new Key(
+                Config::inst()->get(JWTUtils::class, 'secret'),
+                'HS256'
+            )
+        );
+
         $jwt = JWTUtils::inst()->renew($bearer);
 
         if (!$jwt) {
             return $this->httpError(401);
         }
 
+        // Set the current user
+        $memberId = $token->memberId;
+        $member = Member::get()->byID($memberId);
+
+        if ($member) {
+            Injector::inst()->get(IdentityStore::class)->logIn($member);
+            Security::setCurrentUser($member);
+        }
+
         return $jwt;
     }
+
 
     public function getAuthorizationHeader(): string
     {
@@ -378,7 +413,6 @@ class ApiController extends Controller
     public function hasVar($name)
     {
         $key = strtolower($name);
-
         return (isset($this->vars[$key]));
     }
 

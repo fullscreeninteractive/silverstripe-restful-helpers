@@ -4,6 +4,9 @@ namespace FullscreenInteractive\Restful\Controllers;
 
 use Level51\JWTUtils\JWTUtils;
 use Level51\JWTUtils\JWTUtilsException;
+use SilverStripe\Security\Member;
+use SilverStripe\Security\Security;
+use SilverStripe\View\ArrayData;
 
 class AuthController extends ApiController
 {
@@ -20,7 +23,27 @@ class AuthController extends ApiController
     public function token()
     {
         try {
-            $payload = JWTUtils::inst()->byBasicAuth($this->request);
+            $payload = JWTUtils::inst()->byBasicAuth($this->request, true);
+
+            if (isset($payload['member']['id'])) {
+                $member = Member::get()->byID($payload['member']['id']);
+
+                if ($member) {
+                    $api = [];
+
+                    if ($member->hasMethod('toApi')) {
+                        $api = $member->toApi() ?? [];
+
+                        if ($api instanceof ArrayData) {
+                            $api = $api->toMap();
+                        }
+                    }
+
+                    $payload['member'] = array_merge($payload['member'], $api);
+                }
+
+                return $this->returnArray($payload);
+            }
 
             $this->extend('updatePayload', $payload);
 
@@ -30,14 +53,20 @@ class AuthController extends ApiController
         }
     }
 
+
     /**
      * Verifies a token is valid
      */
     public function verify()
     {
         if ($jwt = $this->getJwt()) {
+            $member = Security::getCurrentUser();
+
             return $this->returnArray(
-                ['token' => $jwt]
+                [
+                    'token' => $jwt,
+                    'member' => $member->toApi(),
+                ]
             );
         }
     }

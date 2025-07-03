@@ -276,6 +276,22 @@ private static $extensions = [
 
 A UUID will be generated on an objects `onBeforeWrite()` .
 
+## FAQ
+
+### I'm getting a 301 redirect when trying to call my api/endpoint
+
+In Silverstripe 5 `CanonicalURLMiddleware` is enabled to add a trialing 
+slash by default. This can cause issues in production so we recommend
+disabling this completely for any API routes.
+
+```yml
+SilverStripe\Core\Injector\Injector:
+  SilverStripe\Control\Middleware\CanonicalURLMiddleware:
+    properties:
+      enforceTrailingSlashConfigIgnorePaths:
+        - 'api/'
+```
+
 ## API Documentation
 
 Todo but it's not massive. See `ApiController` for now.
