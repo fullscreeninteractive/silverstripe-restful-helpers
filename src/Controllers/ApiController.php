@@ -145,16 +145,16 @@ class ApiController extends Controller
     /**
      * Returns a HTTP response with the provided data encoded as JSON.
      */
-    public function returnArray(array $data, $flags = null): HTTPResponse
+    public function returnArray(array $data): HTTPResponse
     {
-        return $this->getResponse()->setBody(json_encode($data, $flags));
+        return $this->getResponse()->setBody(json_encode($data));
     }
 
 
     /**
      * Convert a provided DataList to a PaginatedList and return the source.
      */
-    public function prepList(SS_List $list, ?callable $keyFunc = null, ?callable $dataFunc = null,): array
+    public function prepList(SS_List $list, ?callable $keyFunc = null, ?callable $dataFunc = null): array
     {
         $output = [];
 
@@ -184,7 +184,12 @@ class ApiController extends Controller
     /**
      * Convert a provided List to a PaginatedList and return the source.
      */
-    public function prepPaginatedOutput(SS_List $list, ?callable $keyFunc = null, ?callable $dataFunc = null, ?int $pageLength = null): array
+    public function prepPaginatedOutput(
+        SS_List $list,
+        ?callable $keyFunc = null,
+        ?callable $dataFunc = null,
+        ?int $pageLength = null
+    ): array {
     {
         $list = PaginatedList::create($list, $this->request);
 
