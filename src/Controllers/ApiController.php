@@ -129,6 +129,7 @@ class ApiController extends Controller
      * @param SS_List $list
      * @param callable $keyFunc
      * @param callable $dataFunc
+     * @param int $pageLength
      *
      * @return HTTPResponse
      */
@@ -242,7 +243,7 @@ class ApiController extends Controller
      */
     public function ensureUserLoggedIn($permissionCodes = [])
     {
-        $token = JWT::decode(
+        $token = (array)JWT::decode(
             $this->getJwt(),
             new Key(
                 Config::inst()->get(JWTUtils::class, 'secret'),
@@ -250,22 +251,24 @@ class ApiController extends Controller
             )
         );
 
-        $member = Member::get()->byID($token->memberId);
+        if ($token && isset($token['memberId'])) {
+            $member = Member::get()->byID($token['memberId']);
 
-        if ($member) {
-            if ($permissionCodes) {
-                if (!Permission::checkMember($member, $permissionCodes)) {
-                    return $this->httpError(401);
+            if ($member) {
+                if ($permissionCodes) {
+                    if (!Permission::checkMember($member, $permissionCodes)) {
+                        return $this->httpError(401);
+                    }
                 }
+
+                Injector::inst()->get(IdentityStore::class)->logIn($member);
+
+                Security::setCurrentUser($member);
+
+                return $member;
+            } else {
+                return $this->httpError(401);
             }
-
-            Injector::inst()->get(IdentityStore::class)->logIn($member);
-
-            Security::setCurrentUser($member);
-
-            return $member;
-        } else {
-            return $this->httpError(401);
         }
     }
 
@@ -430,12 +433,12 @@ class ApiController extends Controller
         foreach ($vars as $k => $v) {
             if ($v && is_callable($v)) {
                 if (!$this->hasVar($k) || !$v($this->getVar($k))) {
-                    throw $this->httpError(400, 'Missing required variable: '. $v);
+                    throw $this->httpError(400, 'Missing required variable: ' . $v);
                 }
 
                 $output[] = $this->getVar($k);
             } elseif (!$this->hasVar($v)) {
-                throw $this->httpError(400, 'Missing required variable: '. $v);
+                throw $this->httpError(400, 'Missing required variable: ' . $v);
             } else {
                 $output[] = $this->getVar($v);
             }

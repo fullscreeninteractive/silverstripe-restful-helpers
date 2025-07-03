@@ -16,7 +16,7 @@
   ],
   "require": {
     "silverstripe/framework": "^4 || ^5",
-    "level51/silverstripe-jwt-utils": "^1.0"
+    "level51/silverstripe-jwt-utils": "^1"
   },
   "require-dev": {
     "phpunit/phpunit": "^9.5",

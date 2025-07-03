@@ -20,7 +20,8 @@ class AuthController extends ApiController
      * username / password and completed this first step then we give them back
      * a token which contains their information
      */
-    public function token() {
+    public function token()
+    {
         try {
             $payload = JWTUtils::inst()->byBasicAuth($this->request, true);
 
@@ -43,6 +44,8 @@ class AuthController extends ApiController
 
                 return $this->returnArray($payload);
             }
+
+            $this->extend('updatePayload', $payload);
 
             return $this->returnArray($payload);
         } catch (JWTUtilsException $e) {
