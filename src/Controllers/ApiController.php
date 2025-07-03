@@ -189,8 +189,7 @@ class ApiController extends Controller
         ?callable $keyFunc = null,
         ?callable $dataFunc = null,
         ?int $pageLength = null
-    ): array
-    {
+    ): array {
         $list = PaginatedList::create($list, $this->request);
 
         if ($pageLength) {
