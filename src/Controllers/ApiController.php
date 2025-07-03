@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace FullscreenInteractive\Restful\Controllers;
 
+use ArrayAccess;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Level51\JWTUtils\JWTUtils;
@@ -10,8 +13,8 @@ use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Control\HTTPResponse_Exception;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Injector\Injector;
-use SilverStripe\ORM\PaginatedList;
-use SilverStripe\ORM\SS_List;
+use SilverStripe\Model\List\PaginatedList;
+use SilverStripe\Model\List\SS_List;
 use SilverStripe\Security\IdentityStore;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
@@ -51,19 +54,19 @@ class ApiController extends Controller
 
             if ($input) {
                 $this->vars = array_merge($input, $this->request->getVars());
-            } else if ($jsonPayload) {
+            } elseif ($jsonPayload) {
                 $error = json_last_error();
 
                 switch ($error) {
                     case JSON_ERROR_NONE:
                         $this->vars = $this->request->getVars();
-                    break;
+                        break;
                     default:
                         $this->failure([
                             'error' => 'Invalid JSON',
                             'code' => $error
                         ]);
-                    break;
+                        break;
                 }
             } else {
                 $this->vars = $this->request->requestVars();
@@ -89,8 +92,6 @@ class ApiController extends Controller
 
     /**
      * Outputs a successful response (200)
-     *
-     * @param array $context
      */
     public function success(array $context = []): HTTPResponse
     {
@@ -104,10 +105,8 @@ class ApiController extends Controller
 
     /**
      * Returns a error response.
-     *
-     * @param array $context
      */
-    public function failure(array $context = [])
+    public function failure(array $context = []): HTTPResponse
     {
         $response = $this->getResponse();
 
@@ -125,15 +124,12 @@ class ApiController extends Controller
         return $response;
     }
 
-    /**
-     * @param SS_List $list
-     * @param callable $keyFunc
-     * @param callable $dataFunc
-     *
-     * @return HTTPResponse
-     */
-    public function returnPaginated(SS_List $list, $keyFunc = null, $dataFunc = null, $pageLength = 100)
-    {
+    public function returnPaginated(
+        ArrayAccess $list,
+        ?callable $keyFunc = null,
+        ?callable $dataFunc = null,
+        ?int $pageLength = 100
+    ): HTTPResponse {
         list($list, $output) = $this->prepPaginatedOutput($list, $keyFunc, $dataFunc, $pageLength);
 
         return $this->returnArray([
@@ -145,35 +141,27 @@ class ApiController extends Controller
         ]);
     }
 
+
     /**
-     * @param array
-     *
-     * @return HTTPResponse
+     * Returns a HTTP response with the provided data encoded as JSON.
      */
-    public function returnArray($arr)
+    public function returnArray(array $data, $flags = null): HTTPResponse
     {
-        return $this->getResponse()->setBody(json_encode($arr));
+        return $this->getResponse()->setBody(json_encode($data, $flags));
     }
 
 
     /**
      * Convert a provided DataList to a PaginatedList and return the source.
-     *
-     * @param SS_List $list
-     * @param callable $keyFunc
-     * @param callabale $dataFunc
-     * @param int $pageLength
-     *
-     * @return array
      */
-    public function prepList(SS_List $list, $keyFunc = null, $dataFunc = null): array
+    public function prepList(SS_List $list, ?callable $keyFunc = null, ?callable $dataFunc = null,): array
     {
         $output = [];
 
         foreach ($list as $item) {
             if ($dataFunc) {
                 $record = $dataFunc($item);
-            } else if (is_array($item)) {
+            } elseif (is_array($item)) {
                 $record = $item;
             } else {
                 $record = $item->toApi();
@@ -195,24 +183,21 @@ class ApiController extends Controller
 
     /**
      * Convert a provided List to a PaginatedList and return the source.
-     *
-     * @param SS_List $list
-     * @param callable $keyFunc
-     * @param callabale $dataFunc
-     * @param int $pageLength
-     *
-     * @return array
      */
-    public function prepPaginatedOutput(SS_List $list, $keyFunc = null, $dataFunc = null, $pageLength = 100): array
+    public function prepPaginatedOutput(SS_List $list, ?callable $keyFunc = null, ?callable $dataFunc = null, ?int $pageLength = null): array
     {
-        $list = new PaginatedList($list, $this->request);
-        $list->setPageLength($pageLength);
+        $list = PaginatedList::create($list, $this->request);
+
+        if ($pageLength) {
+            $list->setPageLength($pageLength);
+        }
+
         $output = [];
 
         foreach ($list as $item) {
             if ($dataFunc) {
                 $record = $dataFunc($item);
-            } else if (is_array($item)) {
+            } elseif (is_array($item)) {
                 $record = $item;
             } else {
                 $record = $item->toApi();
@@ -235,12 +220,9 @@ class ApiController extends Controller
      * If this endpoint requires authorization then we want to get the member
      * for the operation.
      *
-     * @param array $permissionCodes
-     *
-     * @return Member
      * @throws HTTPResponse_Exception
      */
-    public function ensureUserLoggedIn($permissionCodes = [])
+    public function ensureUserLoggedIn(?array $permissionCodes = null): Member
     {
         $token = JWT::decode(
             $this->getJwt(),
@@ -270,9 +252,11 @@ class ApiController extends Controller
     }
 
     /**
-     * @return string The renewed decoded token
+     * Returns the JWT token from the Authorization header.
+     *
+     * @throws HTTPResponse_Exception
      */
-    public function getJwt()
+    public function getJwt(): string
     {
         $bearer = $this->getBearerToken();
 
@@ -321,7 +305,10 @@ class ApiController extends Controller
             $header = trim($auth);
         } elseif (function_exists('apache_request_headers')) {
             $requestHeaders = apache_request_headers();
-            $requestHeaders = array_combine(array_map('ucwords', array_keys($requestHeaders)), array_values($requestHeaders));
+            $requestHeaders = array_combine(
+                array_map('ucwords', array_keys($requestHeaders)),
+                array_values($requestHeaders)
+            );
 
             if (isset($requestHeaders['Authorization'])) {
                 $header = trim($requestHeaders['Authorization']);
@@ -333,8 +320,6 @@ class ApiController extends Controller
 
     /**
      * Returns the bearer token value from the Authorization Header
-     *
-     * @return string
      */
     public function getBearerToken(): string
     {
@@ -376,7 +361,7 @@ class ApiController extends Controller
             'code' => $errorCode
         ]);
 
-        $response = new HTTPResponse(
+        $response = HTTPResponse::create(
             $body,
             $errorCode
         );
@@ -391,11 +376,9 @@ class ApiController extends Controller
     }
 
     /**
-     * @param string
-     *
-     * @return mixed
+     * Returns a variable from the POST or GET vars
      */
-    public function getVar($name)
+    public function getVar(string $name): mixed
     {
         $key = strtolower($name);
 
@@ -403,39 +386,33 @@ class ApiController extends Controller
     }
 
     /**
-     * @param string
-     *
-     * @return boolean
+     * Checks if a variable exists in the POST or GET vars
      */
-    public function hasVar($name)
+    public function hasVar(string $name): bool
     {
         $key = strtolower($name);
+
         return (isset($this->vars[$key]));
     }
 
     /**
      * Returns an array of all the variables listed from the POST or GET vars
      *
-     *
-     * @param array
-     *
-     * @return array
-     *
      * @throws HTTPResponse_Exception
      */
-    public function ensureVars(array $vars = [])
+    public function ensureVars(?array $vars = [])
     {
         $output = [];
 
         foreach ($vars as $k => $v) {
             if ($v && is_callable($v)) {
                 if (!$this->hasVar($k) || !$v($this->getVar($k))) {
-                    throw $this->httpError(400, 'Missing required variable: '. $v);
+                    throw $this->httpError(400, 'Missing required variable: ' . $k);
                 }
 
                 $output[] = $this->getVar($k);
             } elseif (!$this->hasVar($v)) {
-                throw $this->httpError(400, 'Missing required variable: '. $v);
+                throw $this->httpError(400, 'Missing required variable: ' . $v);
             } else {
                 $output[] = $this->getVar($v);
             }
@@ -444,14 +421,10 @@ class ApiController extends Controller
         return $output;
     }
 
-    /**
-     * @param mixed
-     *
-     * @return HTTPResponse
-     */
-    public function returnJSON($arr)
+
+    public function returnJSON(mixed $value): HTTPResponse
     {
-        return $this->getResponse()->setBody(json_encode($arr));
+        return $this->getResponse()->setBody(json_encode($value));
     }
 
     /**

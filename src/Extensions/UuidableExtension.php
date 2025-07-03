@@ -3,9 +3,9 @@
 namespace FullscreenInteractive\Restful\Extensions;
 
 use Ramsey\Uuid\Uuid;
-use SilverStripe\ORM\DataExtension;
+use SilverStripe\Core\Extension;
 
-class UuidableExtension extends DataExtension
+class UuidableExtension extends Extension
 {
     private static $db = [
         'UUID' => 'Varchar(200)'

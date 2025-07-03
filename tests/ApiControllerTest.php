@@ -11,8 +11,8 @@ class ApiControllerTest extends SapphireTest
 {
     public function testGetVar()
     {
-        $api = new ApiController();
-        $response = $api->handleRequest((new HTTPRequest('GET', '/api/', [
+        $api = ApiController::create();
+        $api->handleRequest((new HTTPRequest('GET', '/api/', [
             'foo' => 1
         ]))->setSession(new Session([])));
 
@@ -22,8 +22,8 @@ class ApiControllerTest extends SapphireTest
 
     public function testHasVar()
     {
-        $api = new ApiController();
-        $response = $api->handleRequest((new HTTPRequest('GET', '/api/', [
+        $api = ApiController::create();
+        $api->handleRequest((new HTTPRequest('GET', '/api/', [
             'foo' => 1
         ]))->setSession(new Session([])));
 
@@ -33,8 +33,9 @@ class ApiControllerTest extends SapphireTest
 
     public function testEnsureVars()
     {
-        $api = new ApiController();
-        $response = $api->handleRequest((new HTTPRequest('GET', '/api/', [
+        $api = ApiController::create();
+
+        $api->handleRequest((new HTTPRequest('GET', '/api/', [
             'foo' => 1
         ]))->setSession(new Session([])));
 

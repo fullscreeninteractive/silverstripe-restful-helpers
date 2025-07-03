@@ -4,9 +4,9 @@ namespace FullscreenInteractive\Restful\Controllers;
 
 use Level51\JWTUtils\JWTUtils;
 use Level51\JWTUtils\JWTUtilsException;
+use SilverStripe\Model\ArrayData;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
-use SilverStripe\View\ArrayData;
 
 class AuthController extends ApiController
 {
@@ -20,7 +20,8 @@ class AuthController extends ApiController
      * username / password and completed this first step then we give them back
      * a token which contains their information
      */
-    public function token() {
+    public function token()
+    {
         try {
             $payload = JWTUtils::inst()->byBasicAuth($this->request, true);
 
@@ -57,14 +58,13 @@ class AuthController extends ApiController
     public function verify()
     {
         if ($jwt = $this->getJwt()) {
-            $member = Security::getCurrentUser();
+            $verifyResponse = [
+                'token' => $jwt
+            ];
 
-            return $this->returnArray(
-                [
-                    'token' => $jwt,
-                    'member' => $member->toApi(),
-                ]
-            );
+            $this->invokeWithExtensions('onVerify', $verifyResponse);
+
+            return $this->returnArray($verifyResponse);
         }
     }
 }
