@@ -1,6 +1,6 @@
 <?php
 
-namespace Level51\JWTUtils;
+namespace FullscreenInteractive\Restful\Auth;
 
 class JWTUtilsException extends \Exception
 {

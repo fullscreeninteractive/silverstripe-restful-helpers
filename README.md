@@ -18,17 +18,49 @@ composer require fullscreeninteractive/silverstripe-restful-helpers
 
 ## Usage
 
-If you plan on using Authenication for your API then you first need to config
-the [https://github.com/Level51/silverstripe-jwt-utils/](JWTUtils) module.
+If you plan on using authentication for your API then you first need to
+configure a secret for signing JWTs. The secret must be at least 32 bytes and
+should be loaded from the environment rather than committed to your repository.
+
+_.env_
+
+```
+JWT_SECRET="generate-with: openssl rand -base64 48"
+```
 
 _app/\_config/api.yml_
 
 ```yml
-Level51\JWTUtils\JWTUtils:
-  secret: 'replace-this-with-a-jwt-secret-for-jwt'
-  lifetime_in_days: 365
+FullscreenInteractive\Restful\Auth\JWTUtils:
+  secret: '`JWT_SECRET`'
+  # How long a token is valid for without being renewed
+  lifetime_in_days: 7
+  # How often a token is reissued with a fresh expiry
   renew_threshold_in_minutes: 60
+  # Optional hard limit after which the user must log in again (null = none)
+  max_lifetime_in_days: 30
+
+FullscreenInteractive\Restful\Controllers\ApiController:
+  # Origins allowed to call the API from a browser. Defaults to ['*'].
+  allowed_origins:
+    - 'https://app.example.com'
 ```
+
+### Upgrading from 1.x
+
+Earlier versions depended on `level51/silverstripe-jwt-utils`. That code is now
+part of this module, so rename any `Level51\JWTUtils\JWTUtils` config or code
+references to `FullscreenInteractive\Restful\Auth\JWTUtils`. Existing tokens
+remain valid as long as the secret is unchanged and at least 32 bytes long;
+shorter secrets are rejected and must be rotated (which logs out all users).
+
+Other behaviour changes:
+
+- A valid bearer token sets the current user for that request only and no
+  longer creates a session (cookie) login.
+- Tokens for deleted or locked out members are rejected with a `401`.
+- `ensureUserLoggedIn($permissions)` returns `403` rather than `401` when the
+  member is authenticated but lacks the permission.
 
 Next step is to setup the routing for the API. You can modify the name of the
 routes as required for the project. At the very least you would have a
@@ -182,9 +214,9 @@ related meta data can be saved securely client side for reuse.
     "token": "eyJ0eXAiOiJKV1QiL...",
     "member": {
         "id": 1,
-        "email": "js@lvl51.de",
-        "firstName": "Julian",
-        "surname": "Scheuchenzuber"
+        "email": "jane@example.com",
+        "firstName": "Jane",
+        "surname": "Doe"
     }
 }
 ```
@@ -204,7 +236,12 @@ fetch('/api/v1/auth/verify', {
 })
 ```
 
-The token can then be used to sign API calls as the `Bearer` header.
+The token can then be used to sign API calls as the `Bearer` header. If the
+token was renewed, use the new token from the `verify` response for later
+requests.
+
+Note that the `token` endpoint authenticates with email and password only, so
+it does not enforce multi-factor authentication. Only expose it over HTTPS.
 
 ```js
 fetch('/api/v1/projects/createProject', {
