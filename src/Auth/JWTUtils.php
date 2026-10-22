@@ -48,6 +48,10 @@ class JWTUtils
     private static $secret = null;
 
     /**
+     * Issuer written to, and required in, every token. Defaults to the site's
+     * absolute base URL. Set this explicitly if the API is served from more
+     * than one domain, otherwise tokens only work on the domain issuing them.
+     *
      * @config
      * @var string|null
      */
@@ -156,10 +160,15 @@ class JWTUtils
         return $exp;
     }
 
+    public function getIssuer(): string
+    {
+        return (string) (static::config()->get('iss') ?: Director::absoluteBaseURL());
+    }
+
     public function getClaims(): array
     {
         return [
-            'iss' => static::config()->get('iss') ?: Director::absoluteBaseURL(),
+            'iss' => $this->getIssuer(),
             'exp' => $this->calcExpirationClaim(),
             'iat' => time(),
             'rat' => time(),
@@ -173,8 +182,11 @@ class JWTUtils
     }
 
     /**
-     * Verifies the signature and expiry of the token and that it identifies a
-     * member. Returns the claims.
+     * Verifies the signature, expiry and issuer of the token and that it
+     * identifies a member. Returns the claims.
+     *
+     * This does not check the member still exists or that the token has not
+     * been revoked, see {@link isValidForMember()}.
      *
      * @throws JWTUtilsException
      */
@@ -184,6 +196,10 @@ class JWTUtils
             $claims = (array) JWT::decode($token, new Key($this->signingKey, self::ALGORITHM));
         } catch (\Exception $e) {
             throw new JWTUtilsException($e->getMessage(), 0, $e);
+        }
+
+        if (!isset($claims['iss']) || $claims['iss'] !== $this->getIssuer()) {
+            throw new JWTUtilsException('Token was not issued by this site');
         }
 
         $memberId = filter_var($claims['memberId'] ?? null, FILTER_VALIDATE_INT, [
@@ -212,8 +228,34 @@ class JWTUtils
     public function createTokenForMember(Member $member): string
     {
         return $this->encode(array_merge([
-            'memberId' => (int) $member->ID
+            'memberId' => (int) $member->ID,
+            'ver' => self::getTokenVersion($member)
         ], $this->getClaims()));
+    }
+
+    /**
+     * Checks decoded claims belong to the member and have not been revoked.
+     */
+    public function isValidForMember(array $claims, Member $member): bool
+    {
+        return isset($claims['memberId'])
+            && (int) $claims['memberId'] === (int) $member->ID
+            && (int) ($claims['ver'] ?? 0) === self::getTokenVersion($member);
+    }
+
+    /**
+     * Invalidates every token previously issued to the member. This happens
+     * automatically when the member's password changes.
+     */
+    public static function revokeTokensForMember(Member $member): void
+    {
+        $member->JWTTokenVersion = self::getTokenVersion($member) + 1;
+        $member->write();
+    }
+
+    private static function getTokenVersion(Member $member): int
+    {
+        return (int) $member->JWTTokenVersion;
     }
 
     /**

@@ -4,6 +4,7 @@ namespace FullscreenInteractive\Restful\Tests;
 
 use FullscreenInteractive\Restful\Auth\JWTUtils;
 use FullscreenInteractive\Restful\Controllers\ApiController;
+use FullscreenInteractive\Restful\Controllers\AuthController;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse_Exception;
 use SilverStripe\Control\Session;
@@ -23,6 +24,7 @@ class ApiControllerTest extends SapphireTest
 
         JWTUtils::tearDown();
         Config::modify()->set(JWTUtils::class, 'secret', 'test-secret-that-is-at-least-32-bytes-long');
+        Config::modify()->set(JWTUtils::class, 'iss', 'https://api.example.com');
     }
 
     protected function tearDown(): void
@@ -131,6 +133,75 @@ class ApiControllerTest extends SapphireTest
         $api = $this->createApi('Bearer ' . JWTUtils::inst()->createTokenForMember($member));
 
         $this->assertHttpError(403, fn () => $api->ensureUserLoggedIn(['ADMIN']));
+    }
+
+    public function testPasswordChangeRevokesTokens()
+    {
+        $member = $this->createMember();
+        $token = JWTUtils::inst()->createTokenForMember($member);
+
+        $member->Password = 'a-new-Passw0rd!';
+        $member->write();
+
+        $api = $this->createApi('Bearer ' . $token);
+        $this->assertHttpError(401, fn () => $api->ensureUserLoggedIn());
+
+        // A token issued after the change works
+        $api = $this->createApi('Bearer ' . JWTUtils::inst()->createTokenForMember($member));
+        $this->assertSame($member->ID, $api->ensureUserLoggedIn()->ID);
+    }
+
+    public function testUnrelatedWriteDoesNotRevokeTokens()
+    {
+        $member = $this->createMember();
+        $token = JWTUtils::inst()->createTokenForMember($member);
+
+        $member->FirstName = 'Changed';
+        $member->write();
+
+        $api = $this->createApi('Bearer ' . $token);
+        $this->assertSame($member->ID, $api->ensureUserLoggedIn()->ID);
+    }
+
+    public function testRevokeTokensForMember()
+    {
+        $member = $this->createMember();
+        $token = JWTUtils::inst()->createTokenForMember($member);
+
+        JWTUtils::revokeTokensForMember($member);
+
+        $api = $this->createApi('Bearer ' . $token);
+        $this->assertHttpError(401, fn () => $api->ensureUserLoggedIn());
+    }
+
+    public function testRenewedTokenIsRevokedToo()
+    {
+        Config::modify()->set(JWTUtils::class, 'renew_threshold_in_minutes', 0);
+
+        $member = $this->createMember();
+        $renewed = JWTUtils::inst()->renew(JWTUtils::inst()->createTokenForMember($member));
+
+        JWTUtils::revokeTokensForMember($member);
+
+        $api = $this->createApi('Bearer ' . $renewed);
+        $this->assertHttpError(401, fn () => $api->ensureUserLoggedIn());
+    }
+
+    public function testRevokeEndpoint()
+    {
+        $member = $this->createMember();
+        $token = JWTUtils::inst()->createTokenForMember($member);
+
+        $request = (new HTTPRequest('POST', 'revoke'))->setSession(new Session([]));
+        $request->addHeader('Authorization', 'Bearer ' . $token);
+
+        $response = AuthController::create()->handleRequest($request);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(1, (int) Member::get()->byID($member->ID)->JWTTokenVersion);
+
+        $api = $this->createApi('Bearer ' . $token);
+        $this->assertHttpError(401, fn () => $api->ensureUserLoggedIn());
     }
 
     public function testInvalidJsonIsRejected()

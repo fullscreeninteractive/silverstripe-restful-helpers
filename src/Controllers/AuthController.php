@@ -12,6 +12,7 @@ class AuthController extends ApiController
     private static $allowed_actions = [
         'token',
         'verify',
+        'revoke',
     ];
 
     public function init()
@@ -73,5 +74,19 @@ class AuthController extends ApiController
 
             return $this->returnArray($verifyResponse);
         }
+    }
+
+
+    /**
+     * Revokes every token issued to the current member, logging them out of
+     * all devices.
+     */
+    public function revoke()
+    {
+        $this->ensurePOST();
+
+        JWTUtils::revokeTokensForMember($this->ensureUserLoggedIn());
+
+        return $this->success();
     }
 }

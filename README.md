@@ -39,6 +39,9 @@ FullscreenInteractive\Restful\Auth\JWTUtils:
   renew_threshold_in_minutes: 60
   # Optional hard limit after which the user must log in again (null = none)
   max_lifetime_in_days: 30
+  # Issuer written to and required in every token. Defaults to the site's
+  # base URL; set it if the API is served from more than one domain.
+  iss: 'https://www.example.com/'
 
 FullscreenInteractive\Restful\Controllers\ApiController:
   # Origins allowed to call the API from a browser. Defaults to ['*'].
@@ -61,6 +64,9 @@ Other behaviour changes:
 - Tokens for deleted or locked out members are rejected with a `401`.
 - `ensureUserLoggedIn($permissions)` returns `403` rather than `401` when the
   member is authenticated but lacks the permission.
+- Tokens must carry an `iss` claim matching the configured issuer.
+- A `JWTTokenVersion` column is added to `Member` (run `dev/build`). Changing a
+  member's password revokes their existing tokens.
 
 Next step is to setup the routing for the API. You can modify the name of the
 routes as required for the project. At the very least you would have a
@@ -239,6 +245,31 @@ fetch('/api/v1/auth/verify', {
 The token can then be used to sign API calls as the `Bearer` header. If the
 token was renewed, use the new token from the `verify` response for later
 requests.
+
+### Revoking tokens
+
+Each token records the member's token version. Incrementing it invalidates
+every token the member holds, including renewed ones. This happens
+automatically when the member's password changes, and can be triggered from
+code (e.g. when disabling an account):
+
+```php
+use FullscreenInteractive\Restful\Auth\JWTUtils;
+
+JWTUtils::revokeTokensForMember($member);
+```
+
+Clients can log a user out of every device by calling the `revoke` endpoint
+with a valid token:
+
+```js
+fetch('/api/v1/auth/revoke', {
+    method: "POST",
+    headers: {
+        Authorization: "Bearer " + token,
+    },
+})
+```
 
 Note that the `token` endpoint authenticates with email and password only, so
 it does not enforce multi-factor authentication. Only expose it over HTTPS.

@@ -308,7 +308,7 @@ class ApiController extends Controller
 
         $member = Member::get()->byID($claims['memberId']);
 
-        if (!$member || !$member->canLogin()) {
+        if (!$member || !$member->canLogin() || !$utils->isValidForMember($claims, $member)) {
             return $this->httpError(401);
         }
 
