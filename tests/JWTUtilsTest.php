@@ -10,7 +10,7 @@ use SilverStripe\Dev\SapphireTest;
 
 class JWTUtilsTest extends SapphireTest
 {
-    private const SECRET = 'test-secret';
+    private const SECRET = 'test-secret-that-is-at-least-32-bytes-long';
 
     protected function setUp(): void
     {
