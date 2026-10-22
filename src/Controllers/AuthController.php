@@ -2,18 +2,26 @@
 
 namespace FullscreenInteractive\Restful\Controllers;
 
-use Level51\JWTUtils\JWTUtils;
-use Level51\JWTUtils\JWTUtilsException;
+use FullscreenInteractive\Restful\Auth\JWTUtils;
+use FullscreenInteractive\Restful\Auth\JWTUtilsException;
 use SilverStripe\Model\ArrayData;
 use SilverStripe\Security\Member;
-use SilverStripe\Security\Security;
 
 class AuthController extends ApiController
 {
     private static $allowed_actions = [
         'token',
         'verify',
+        'revoke',
     ];
+
+    public function init()
+    {
+        parent::init();
+
+        // Responses contain credentials so must never be cached
+        $this->getResponse()->addHeader('Cache-Control', 'no-store');
+    }
 
     /**
      * The token is acquired by using basic auth. Once the user has entered the
@@ -66,5 +74,19 @@ class AuthController extends ApiController
 
             return $this->returnArray($verifyResponse);
         }
+    }
+
+
+    /**
+     * Revokes every token issued to the current member, logging them out of
+     * all devices.
+     */
+    public function revoke()
+    {
+        $this->ensurePOST();
+
+        JWTUtils::revokeTokensForMember($this->ensureUserLoggedIn());
+
+        return $this->success();
     }
 }

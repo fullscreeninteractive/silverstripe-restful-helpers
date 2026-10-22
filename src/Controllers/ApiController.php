@@ -5,40 +5,53 @@ declare(strict_types=1);
 namespace FullscreenInteractive\Restful\Controllers;
 
 use ArrayAccess;
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
-use Level51\JWTUtils\JWTUtils;
+use FullscreenInteractive\Restful\Auth\JWTUtils;
+use FullscreenInteractive\Restful\Auth\JWTUtilsException;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Control\HTTPResponse_Exception;
-use SilverStripe\Core\Config\Config;
-use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Model\List\PaginatedList;
 use SilverStripe\Model\List\SS_List;
-use SilverStripe\Security\IdentityStore;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
 
 class ApiController extends Controller
 {
+    /**
+     * Origins allowed to make cross-origin requests. Include '*' to allow any
+     * origin. Authentication is by bearer token only, never cookies.
+     *
+     * @config
+     * @var string[]
+     */
+    private static $allowed_origins = ['*'];
+
+    /**
+     * @var array
+     */
+    protected $vars = [];
+
+    private ?Member $jwtMember = null;
+
+    private ?string $renewedJwt = null;
+
     public function init()
     {
         parent::init();
 
-        if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-            $response = $this->getResponse()
-                ->addHeader('Access-Control-Allow-Origin', '*')
+        if ($this->request->httpMethod() === 'OPTIONS') {
+            $response = $this->addCorsHeaders($this->getResponse())
                 ->addHeader("Content-type", "application/json");
 
-            if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'])) {
+            if ($this->request->getHeader('Access-Control-Request-Method')) {
                 $response = $response->addHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
             }
 
-            if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
+            if ($requestHeaders = $this->request->getHeader('Access-Control-Request-Headers')) {
                 $response = $response->addHeader(
                     'Access-Control-Allow-Headers',
-                    $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']
+                    preg_replace('/[^A-Za-z0-9\-_, ]/', '', $requestHeaders)
                 );
             }
 
@@ -46,31 +59,30 @@ class ApiController extends Controller
             exit;
         }
 
+        $this->addCorsHeaders($this->getResponse())
+            ->addHeader("Content-type", "application/json")
+            ->addHeader('X-Content-Type-Options', 'nosniff');
+
         $contentType = (string) $this->request->getHeader('Content-Type');
+        $jsonPayload = trim((string) $this->request->getBody());
 
-        if (strpos($contentType, 'application/json') !== false) {
-            $jsonPayload = trim(file_get_contents("php://input"));
+        if (strpos($contentType, 'application/json') !== false && $jsonPayload !== '') {
             $input = json_decode($jsonPayload, true);
+            $error = json_last_error();
 
-            if ($input) {
-                $this->vars = array_merge($input, $this->request->getVars());
-            } elseif ($jsonPayload) {
-                $error = json_last_error();
+            if ($error !== JSON_ERROR_NONE) {
+                // An error status marks the response finished so no action runs
+                $this->failure([
+                    'error' => 'Invalid JSON',
+                    'code' => $error
+                ]);
 
-                switch ($error) {
-                    case JSON_ERROR_NONE:
-                        $this->vars = $this->request->getVars();
-                        break;
-                    default:
-                        $this->failure([
-                            'error' => 'Invalid JSON',
-                            'code' => $error
-                        ]);
-                        break;
-                }
-            } else {
-                $this->vars = $this->request->requestVars();
+                return;
             }
+
+            $this->vars = is_array($input)
+                ? array_merge($input, $this->request->getVars())
+                : $this->request->getVars();
         } else {
             $this->vars = $this->request->requestVars();
         }
@@ -78,10 +90,26 @@ class ApiController extends Controller
         if ($this->vars) {
             $this->vars = array_change_key_case($this->vars);
         }
+    }
 
-        $this->getResponse()
-            ->addHeader('Access-Control-Allow-Origin', '*')
-            ->addHeader("Content-type", "application/json");
+    /**
+     * Adds the Access-Control-Allow-Origin header for allowed origins.
+     */
+    protected function addCorsHeaders(HTTPResponse $response): HTTPResponse
+    {
+        $allowed = (array) static::config()->get('allowed_origins');
+
+        if (in_array('*', $allowed, true)) {
+            return $response->addHeader('Access-Control-Allow-Origin', '*');
+        }
+
+        $origin = $this->getRequest()->getHeader('Origin');
+
+        if ($origin && in_array($origin, $allowed, true)) {
+            $response->addHeader('Access-Control-Allow-Origin', $origin);
+        }
+
+        return $response->addHeader('Vary', 'Origin');
     }
 
 
@@ -228,76 +256,69 @@ class ApiController extends Controller
      */
     public function ensureUserLoggedIn(?array $permissionCodes = null): Member
     {
-        $token = JWT::decode(
-            $this->getJwt(),
-            new Key(
-                Config::inst()->get(JWTUtils::class, 'secret'),
-                'HS256'
-            )
-        );
+        $member = $this->authenticateJwt();
 
-        $member = Member::get()->byID($token->memberId);
-
-        if ($member) {
-            if ($permissionCodes) {
-                if (!Permission::checkMember($member, $permissionCodes)) {
-                    return $this->httpError(401);
-                }
-            }
-
-            Injector::inst()->get(IdentityStore::class)->logIn($member);
-
-            Security::setCurrentUser($member);
-
-            return $member;
-        } else {
-            return $this->httpError(401);
+        if ($permissionCodes && !Permission::checkMember($member, $permissionCodes)) {
+            return $this->httpError(403);
         }
+
+        return $member;
     }
 
     /**
-     * Returns the JWT token from the Authorization header.
+     * Validates the bearer token and returns it, renewed if required.
      *
      * @throws HTTPResponse_Exception
      */
     public function getJwt(): string
     {
+        $this->authenticateJwt();
+
+        return $this->renewedJwt;
+    }
+
+    /**
+     * Validates the bearer token and sets the member it identifies as the
+     * current user for this request only. The member is deliberately not
+     * persisted to the session so that a token never creates a cookie login.
+     *
+     * @throws HTTPResponse_Exception
+     */
+    protected function authenticateJwt(): Member
+    {
+        if ($this->jwtMember) {
+            return $this->jwtMember;
+        }
+
         $bearer = $this->getBearerToken();
 
         if (!$bearer) {
             return $this->httpError(401);
         }
 
-        if (!JWTUtils::inst()->check($bearer)) {
+        // Configuration errors should surface rather than look like a 401
+        $utils = JWTUtils::inst();
+
+        try {
+            $claims = $utils->decode($bearer);
+            $renewed = $utils->renew($bearer);
+        } catch (JWTUtilsException $e) {
             return $this->httpError(401);
         }
 
-        $token = JWT::decode(
-            $bearer,
-            new Key(
-                Config::inst()->get(JWTUtils::class, 'secret'),
-                'HS256'
-            )
-        );
+        $member = Member::get()->byID($claims['memberId']);
 
-        $jwt = JWTUtils::inst()->renew($bearer);
-
-        if (!$jwt) {
+        if (!$member || !$member->canLogin() || !$utils->isValidForMember($claims, $member)) {
             return $this->httpError(401);
         }
 
-        // Set the current user
-        $memberId = $token->memberId;
-        $member = Member::get()->byID($memberId);
+        Security::setCurrentUser($member);
 
-        if ($member) {
-            Injector::inst()->get(IdentityStore::class)->logIn($member);
-            Security::setCurrentUser($member);
-        }
+        $this->jwtMember = $member;
+        $this->renewedJwt = $renewed;
 
-        return $jwt;
+        return $member;
     }
-
 
     public function getAuthorizationHeader(): string
     {
@@ -330,7 +351,7 @@ class ApiController extends Controller
         $headers = $this->getAuthorizationHeader();
 
         if (!empty($headers)) {
-            if (preg_match('/Bearer\s(\S+)/', $headers, $matches)) {
+            if (preg_match('/^Bearer\s+(\S+)$/i', $headers, $matches)) {
                 return $matches[1];
             }
         }
@@ -371,7 +392,8 @@ class ApiController extends Controller
         );
 
         $response->addHeader("Content-type", "application/json");
-        $response->addHeader('Access-Control-Allow-Origin', '*');
+        $response->addHeader('X-Content-Type-Options', 'nosniff');
+        $this->addCorsHeaders($response);
 
         $err = new HTTPResponse_Exception();
         $err->setResponse($response);

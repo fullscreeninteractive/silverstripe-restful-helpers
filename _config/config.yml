@@ -1,0 +1,6 @@
+---
+Name: restful-helpers
+---
+SilverStripe\Security\Member:
+  extensions:
+    - FullscreenInteractive\Restful\Extensions\JWTMemberExtension
